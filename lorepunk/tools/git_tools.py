@@ -60,26 +60,41 @@ def register_git_tools(registry: ToolRegistry, workspace: str = ".") -> None:
 
     async def git_add(files: str = ".") -> ToolResult:
         import shlex
-        return await _run_git("add", *shlex.split(files))
+        parts = shlex.split(files)
+        if any(p.startswith("-") for p in parts):
+            return ToolResult("git_add", False, error="Flags not allowed in file paths")
+        return await _run_git("add", "--", *parts)
 
     async def git_commit(message: str) -> ToolResult:
         return await _run_git("commit", "-m", message)
 
     async def git_branch(name: str = "") -> ToolResult:
         if name:
+            if name.startswith("-"):
+                return ToolResult("git_branch", False, error="Invalid branch name")
             return await _run_git("checkout", "-b", name)
         return await _run_git("branch", "-a")
 
     async def git_checkout(ref: str) -> ToolResult:
+        if ref.startswith("-"):
+            return ToolResult("git_checkout", False, error="Invalid ref")
         return await _run_git("checkout", ref)
 
+    SAFE_REMOTES = {"origin", "upstream", "fork"}
+
     async def git_push(remote: str = "origin", branch: str = "") -> ToolResult:
+        if remote not in SAFE_REMOTES:
+            return ToolResult("git_push", False,
+                              error=f"Remote '{remote}' not in allowed list: {SAFE_REMOTES}")
         args = ["push", remote]
         if branch:
             args.append(branch)
         return await _run_git(*args)
 
     async def git_pull(remote: str = "origin") -> ToolResult:
+        if remote not in SAFE_REMOTES:
+            return ToolResult("git_pull", False,
+                              error=f"Remote '{remote}' not in allowed list: {SAFE_REMOTES}")
         return await _run_git("pull", remote)
 
     async def git_stash(action: str = "push") -> ToolResult:

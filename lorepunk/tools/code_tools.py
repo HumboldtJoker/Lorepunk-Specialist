@@ -42,11 +42,14 @@ def register_code_tools(
                 return ToolResult("bash", False, error=f"Blocked command pattern: {blocked}")
 
         try:
+            import os
+            import signal
             proc = await asyncio.create_subprocess_shell(
                 command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=workspace,
+                start_new_session=True,
             )
             stdout, stderr = await asyncio.wait_for(
                 proc.communicate(), timeout=timeout,
@@ -63,7 +66,10 @@ def register_code_tools(
             combined = output + ("\n" + errors if errors else "")
             return ToolResult("bash", True, output=combined[:10000])
         except asyncio.TimeoutError:
-            proc.kill()
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                proc.kill()
             await proc.wait()
             return ToolResult("bash", False, error=f"Command timed out after {timeout}s")
         except Exception as e:
