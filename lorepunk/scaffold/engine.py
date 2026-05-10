@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Awaitable
 
 from lorepunk.scaffold.tool_registry import ToolRegistry, ToolResult
+from lorepunk.scaffold.cache_recorder import CacheDeltaRecorder
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +71,10 @@ class ScaffoldEngine:
         self,
         config: EngineConfig,
         registry: ToolRegistry,
+        recorder: CacheDeltaRecorder | None = None,
     ) -> None:
         self.config = config
+        self.recorder = recorder or CacheDeltaRecorder(model_name=config.model)
         self.registry = registry
         self.history: list[Message] = []
 
@@ -158,6 +161,17 @@ class ScaffoldEngine:
                     data = await resp.json()
 
             message = data.get("message", {})
+
+            # Record telemetry + cache delta data
+            user_msg = next((m.content for m in reversed(self.history) if m.role == "user"), "")
+            tool_names = [tc.get("function", {}).get("name", "") for tc in (message.get("tool_calls") or [])]
+            self.recorder.record_ollama_turn(
+                ollama_response=data,
+                user_query=user_msg,
+                response_text=message.get("content", ""),
+                tool_calls=tool_names,
+            )
+
             return {
                 "content": message.get("content", ""),
                 "tool_calls": message.get("tool_calls"),
