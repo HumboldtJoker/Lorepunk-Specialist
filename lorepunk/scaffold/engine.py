@@ -95,7 +95,14 @@ class ScaffoldEngine:
             response = await self._call_llm()
 
             if not response.get("tool_calls"):
-                text = response.get("content", "")
+                text = response.get("content") or ""
+                # Strip Qwen3 thinking tags if present
+                if "<think>" in text and "</think>" in text:
+                    think_end = text.index("</think>") + len("</think>")
+                    text = text[think_end:].strip()
+                # If still empty, ask the model to respond explicitly
+                if not text.strip():
+                    text = "(The model returned an empty response. Try rephrasing your request.)"
                 self.history.append(Message(
                     role="assistant", content=text,
                     timestamp=datetime.now(timezone.utc).isoformat(),
