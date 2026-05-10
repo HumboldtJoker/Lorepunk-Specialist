@@ -59,6 +59,8 @@ class SubagentSpawner:
         default_api_base: Default Ollama endpoint
     """
 
+    MAX_CONCURRENT = 5
+
     def __init__(
         self,
         parent_registry: ToolRegistry,
@@ -73,6 +75,9 @@ class SubagentSpawner:
 
     async def spawn(self, config: SubagentConfig) -> str:
         """Spawn a subagent. Returns agent_id."""
+        if len(self._active) >= self.MAX_CONCURRENT:
+            return ""
+
         agent_id = f"sub_{uuid.uuid4().hex[:8]}"
         model = config.model or self._default_model
         api_base = config.api_base or self._api_base
@@ -189,7 +194,7 @@ class SubagentSpawner:
                     fn = tc.get("function", {})
                     tool_name = fn.get("name", "")
 
-                    if config.allowed_tools and tool_name not in config.allowed_tools:
+                    if not config.allowed_tools or tool_name not in config.allowed_tools:
                         messages.append({
                             "role": "tool",
                             "content": f"Tool {tool_name} not available to this subagent",

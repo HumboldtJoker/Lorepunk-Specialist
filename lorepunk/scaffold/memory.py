@@ -82,8 +82,11 @@ class MemoryStore:
         self._path = Path(workspace) / self.FILENAME
 
     def save(self, memory: ConversationMemory) -> None:
+        import os
         data = asdict(memory)
-        self._path.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+        tmp = self._path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+        os.replace(str(tmp), str(self._path))
 
     def load(self) -> ConversationMemory:
         if not self._path.exists():

@@ -19,7 +19,7 @@ def register_file_tools(registry: ToolRegistry, workspace: str = ".") -> None:
 
     def _validate_path(file_path: str) -> Path:
         resolved = Path(file_path).resolve()
-        if not str(resolved).startswith(str(workspace_path)):
+        if not (resolved == workspace_path or str(resolved).startswith(str(workspace_path) + os.sep)):
             raise PermissionError(f"Access denied: {file_path} is outside workspace")
         return resolved
 

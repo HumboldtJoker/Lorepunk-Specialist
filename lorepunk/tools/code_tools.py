@@ -63,6 +63,8 @@ def register_code_tools(
             combined = output + ("\n" + errors if errors else "")
             return ToolResult("bash", True, output=combined[:10000])
         except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
             return ToolResult("bash", False, error=f"Command timed out after {timeout}s")
         except Exception as e:
             return ToolResult("bash", False, error=str(e))
@@ -92,6 +94,8 @@ def register_code_tools(
                 )
             return ToolResult("python_execute", True, output=output[:10000])
         except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
             return ToolResult("python_execute", False, error=f"Script timed out after {timeout}s")
         except Exception as e:
             return ToolResult("python_execute", False, error=str(e))

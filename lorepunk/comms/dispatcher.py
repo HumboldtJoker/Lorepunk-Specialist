@@ -31,7 +31,7 @@ class Message:
     content: str
     urgency: Urgency = Urgency.NORMAL
     title: str = ""
-    sender: str = "Kintsugi"
+    sender: str = "Lorepunk"
     recipients: list[str] | None = None  # None = broadcast to all
     group: str | None = None  # Target group/channel within platform
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -212,7 +212,7 @@ class CommsDispatcher:
             content=content,
             title=title,
             urgency=Urgency.CRITICAL,
-            sender="Kintsugi Crisis Response",
+            sender="Lorepunk Alert",
             metadata={"crisis": True},
         )
         return await self.broadcast(message)
@@ -227,7 +227,7 @@ class CommsDispatcher:
             content=briefing_text,
             title="Morning Briefing",
             urgency=Urgency.LOW,
-            sender="Kintsugi Dreamer",
+            sender="Lorepunk",
         )
         return await self.broadcast(message, channels=channels)
 

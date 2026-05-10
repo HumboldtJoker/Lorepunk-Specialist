@@ -53,7 +53,7 @@ except ImportError:
                    "Install with: pip install zstandard")
 
 
-DEFAULT_STORE_DIR = os.path.expanduser("~/.oracle/cache_store")
+DEFAULT_STORE_DIR = os.path.expanduser("~/.lorepunk/cache_store")
 
 
 @dataclass
@@ -95,7 +95,7 @@ class CacheCompressor:
 
     Usage::
 
-        compressor = CacheCompressor(store_dir="~/.oracle/cache_store")
+        compressor = CacheCompressor(store_dir="~/.lorepunk/cache_store")
 
         # Store a cache snapshot
         meta = compressor.store(

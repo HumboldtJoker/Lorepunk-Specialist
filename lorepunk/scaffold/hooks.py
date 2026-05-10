@@ -120,6 +120,8 @@ class HookRegistry:
                         combined.modified_content = result.modified_content
                     if result.message:
                         combined.message = result.message
+            except (SystemExit, KeyboardInterrupt):
+                logger.error("Hook attempted SystemExit/KeyboardInterrupt — blocked")
             except Exception as e:
                 logger.warning("Hook failed for %s: %s", event.event_type, e)
 

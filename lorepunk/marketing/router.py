@@ -20,7 +20,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from lorepunk.marketing.cognition.efe import (
+from lorepunk.marketing.efe import (
     ANALYTICS_WEIGHTS,
     BRAND_STRATEGY_WEIGHTS,
     COMMUNITY_WEIGHTS,
@@ -36,7 +36,7 @@ from lorepunk.marketing.cognition.efe import (
     SOCIAL_MEDIA_WEIGHTS,
     WEB_DESIGN_WEIGHTS,
 )
-from lorepunk.marketing.cognition.fast_classifier import (
+from lorepunk.marketing.fast_classifier import (
     ClassificationStage,
     FastClassification,
     FastClassifier,

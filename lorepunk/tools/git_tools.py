@@ -14,18 +14,20 @@ from lorepunk.tools.code_tools import register_code_tools
 def register_git_tools(registry: ToolRegistry, workspace: str = ".") -> None:
     """Register git operation tools."""
 
-    async def _run_git(command: str) -> ToolResult:
-        """Run a git command in the workspace."""
+    async def _run_git(*args: str) -> ToolResult:
+        """Run a git command in the workspace using exec (not shell) to prevent injection."""
         import asyncio
+        import shlex
 
-        blocked = ["push --force", "reset --hard", "clean -f", "branch -D"]
-        for b in blocked:
-            if b in command:
-                return ToolResult("git", False, error=f"Blocked destructive operation: {b}")
+        blocked_args = ["--force", "-f", "--hard", "-D"]
+        blocked_combos = [("push", "--force"), ("push", "-f"), ("reset", "--hard"), ("clean", "-f"), ("branch", "-D")]
+        for combo in blocked_combos:
+            if all(a in args for a in combo):
+                return ToolResult("git", False, error=f"Blocked destructive operation: {' '.join(combo)}")
 
         try:
-            proc = await asyncio.create_subprocess_shell(
-                f"git {command}",
+            proc = await asyncio.create_subprocess_exec(
+                "git", *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=workspace,
@@ -39,6 +41,8 @@ def register_git_tools(registry: ToolRegistry, workspace: str = ".") -> None:
                                   error=f"Exit {proc.returncode}: {errors[:2000]}")
             return ToolResult("git", True, output=(output + errors)[:10000])
         except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
             return ToolResult("git", False, error="Git command timed out")
         except Exception as e:
             return ToolResult("git", False, error=str(e))
@@ -47,36 +51,41 @@ def register_git_tools(registry: ToolRegistry, workspace: str = ".") -> None:
         return await _run_git("status")
 
     async def git_diff(staged: bool = False) -> ToolResult:
-        cmd = "diff --staged" if staged else "diff"
-        return await _run_git(cmd)
+        if staged:
+            return await _run_git("diff", "--staged")
+        return await _run_git("diff")
 
     async def git_log(n: int = 10) -> ToolResult:
-        return await _run_git(f"log --oneline -n {n}")
+        return await _run_git("log", "--oneline", "-n", str(int(n)))
 
     async def git_add(files: str = ".") -> ToolResult:
-        return await _run_git(f"add {files}")
+        import shlex
+        return await _run_git("add", *shlex.split(files))
 
     async def git_commit(message: str) -> ToolResult:
-        safe_msg = message.replace('"', '\\"')
-        return await _run_git(f'commit -m "{safe_msg}"')
+        return await _run_git("commit", "-m", message)
 
     async def git_branch(name: str = "") -> ToolResult:
         if name:
-            return await _run_git(f"checkout -b {name}")
-        return await _run_git("branch -a")
+            return await _run_git("checkout", "-b", name)
+        return await _run_git("branch", "-a")
 
     async def git_checkout(ref: str) -> ToolResult:
-        return await _run_git(f"checkout {ref}")
+        return await _run_git("checkout", ref)
 
     async def git_push(remote: str = "origin", branch: str = "") -> ToolResult:
-        cmd = f"push {remote}" + (f" {branch}" if branch else "")
-        return await _run_git(cmd)
+        args = ["push", remote]
+        if branch:
+            args.append(branch)
+        return await _run_git(*args)
 
     async def git_pull(remote: str = "origin") -> ToolResult:
-        return await _run_git(f"pull {remote}")
+        return await _run_git("pull", remote)
 
     async def git_stash(action: str = "push") -> ToolResult:
-        return await _run_git(f"stash {action}")
+        if action not in ("push", "pop", "list", "drop"):
+            return ToolResult("git_stash", False, error=f"Invalid stash action: {action}")
+        return await _run_git("stash", action)
 
     tools = [
         ("git_status", "Show working tree status — modified, staged, untracked files.",
