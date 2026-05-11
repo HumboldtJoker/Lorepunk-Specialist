@@ -238,7 +238,7 @@ What are we working on today?
             sendBtn.disabled = true;
 
             addMessage('user', msg);
-            const thinking = addMessage('assistant', 'Thinking...');
+            const thinking = addMessage('assistant', 'Thinking... (large models take a moment)');
             thinking.classList.add('thinking');
 
             try {
@@ -272,6 +272,39 @@ What are we working on today?
             chat.innerHTML = '';
             addMessage('assistant', 'Conversation cleared. What are we working on?');
         }
+
+        // File upload via drag-and-drop
+        const chatContainer = document.getElementById('chat');
+        chatContainer.addEventListener('dragover', (e) => { e.preventDefault(); chatContainer.style.border = '2px dashed #e94560'; });
+        chatContainer.addEventListener('dragleave', () => { chatContainer.style.border = 'none'; });
+        chatContainer.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            chatContainer.style.border = 'none';
+            for (const file of e.dataTransfer.files) {
+                const formData = new FormData();
+                formData.append('file', file);
+                try {
+                    const resp = await fetch('/upload', { method: 'POST', body: formData });
+                    const data = await resp.json();
+                    if (data.status === 'uploaded') {
+                        addMessage('tool', 'upload\\nFile uploaded: ' + data.name + ' → ' + data.path);
+                        sendBtn.disabled = true;
+                        const response = await fetch('/chat', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({message: 'I just uploaded a file called "' + data.name + '" to ' + data.path + '. Please read it and tell me what it contains.'}),
+                        });
+                        const chatData = await response.json();
+                        addMessage('assistant', chatData.response);
+                        sendBtn.disabled = false;
+                    } else {
+                        addMessage('tool', 'upload\\nError: ' + (data.error || 'Upload failed'));
+                    }
+                } catch (err) {
+                    addMessage('tool', 'upload\\nError: ' + err.message);
+                }
+            }
+        });
 
         input.focus();
     </script>
@@ -326,28 +359,27 @@ def create_app(
         if not message:
             return jsonify({"response": "Empty message", "tool_calls": []})
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        # Track tool calls
-        tool_log = []
-        original_execute = registry.execute
-
-        async def logging_execute(tool_name, **kwargs):
-            result = await original_execute(tool_name, **kwargs)
-            tool_log.append({
-                "name": tool_name,
-                "result": result.to_message()[:500],
-            })
-            return result
-
-        registry.execute = logging_execute
+        # Handle /help command locally
+        if message.strip().lower() in ("/help", "help", "/commands"):
+            tool_list = "\n".join(f"  • **{t.name}** — {t.description}" for t in registry.list_tools())
+            help_text = (
+                "**Available Commands:**\n"
+                "  • `/help` — show this help\n"
+                "  • `/clear` or `clear` — reset conversation\n"
+                "  • `/status` — show model and session info\n"
+                "  • `/upload` — drag and drop files into the chat\n\n"
+                f"**Available Tools ({registry.tool_count}):**\n{tool_list}\n\n"
+                "Just ask me to do something and I'll use the right tools automatically."
+            )
+            return jsonify({"response": help_text, "tool_calls": []})
 
         try:
+            loop = asyncio.new_event_loop()
             response = loop.run_until_complete(engine.chat(message))
-        finally:
-            registry.execute = original_execute
             loop.close()
+        except Exception as e:
+            logger.error("Chat error: %s", e)
+            response = f"I encountered an error processing that request. The model may need more time. Please try again. ({type(e).__name__})"
 
         # Auto-save
         if engine.message_count % 5 == 0:
@@ -355,8 +387,22 @@ def create_app(
 
         return jsonify({
             "response": response,
-            "tool_calls": tool_log,
+            "tool_calls": [],
         })
+
+    @app.route("/upload", methods=["POST"])
+    def upload():
+        """Handle file uploads to the workspace."""
+        if "file" not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        f = request.files["file"]
+        if not f.filename:
+            return jsonify({"error": "Empty filename"}), 400
+        safe_name = f.filename.replace("..", "").replace("/", "_")
+        save_path = Path(workspace) / "uploads" / safe_name
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        f.save(str(save_path))
+        return jsonify({"status": "uploaded", "path": str(save_path), "name": safe_name})
 
     @app.route("/clear", methods=["POST"])
     def clear():

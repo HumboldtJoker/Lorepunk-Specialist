@@ -118,9 +118,15 @@ class ScaffoldEngine:
             for tool_call in response["tool_calls"]:
                 fn = tool_call.get("function", {})
                 tool_name = fn.get("name", "")
-                try:
-                    args = json.loads(fn.get("arguments", "{}"))
-                except json.JSONDecodeError:
+                raw_args = fn.get("arguments", {})
+                if isinstance(raw_args, str):
+                    try:
+                        args = json.loads(raw_args)
+                    except json.JSONDecodeError:
+                        args = {}
+                elif isinstance(raw_args, dict):
+                    args = raw_args
+                else:
                     args = {}
 
                 logger.info("Tool call: %s(%s)", tool_name, list(args.keys()))
@@ -164,7 +170,7 @@ class ScaffoldEngine:
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=300)) as resp:
+                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=600)) as resp:
                     data = await resp.json()
 
             message = data.get("message", {})
@@ -205,7 +211,7 @@ class ScaffoldEngine:
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=300)) as resp:
+                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=600)) as resp:
                     data = await resp.json()
 
             choice = data.get("choices", [{}])[0]
