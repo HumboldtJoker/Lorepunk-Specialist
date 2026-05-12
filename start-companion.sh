@@ -46,7 +46,8 @@ PYTHONPATH=$HOME/lorepunk $PYTHON web/app.py \
   --model "qwen3-30b-autonomy" \
   --api-base "http://127.0.0.1:$MLX_PORT" \
   --api-type openai \
-  --workspace "$WORKSPACE" &
+  --workspace "$WORKSPACE" \
+  --system-prompt "$SYSTEM_PROMPT" &
 WEB_PID=$!
 echo "  Web UI PID: $WEB_PID"
 

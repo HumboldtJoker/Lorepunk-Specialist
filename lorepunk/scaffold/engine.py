@@ -208,20 +208,22 @@ class ScaffoldEngine:
             return {"content": f"LLM call failed: {e}"}
 
     async def _call_openai_compat(self) -> dict:
-        """Call an OpenAI-compatible API (vLLM, LiteLLM, etc.)."""
+        """Call an OpenAI-compatible API (vLLM, LiteLLM, MLX, etc.)."""
         try:
             import aiohttp
         except ImportError:
             return {"content": "aiohttp required"}
 
         url = f"{self.config.api_base}/v1/chat/completions"
-        payload = {
+        payload: dict[str, Any] = {
             "model": self.config.model,
             "messages": [m.to_api() for m in self.history],
-            "tools": self.registry.get_schemas(),
             "temperature": self.config.temperature,
             "max_tokens": self.config.max_tokens,
         }
+        schemas = self.registry.get_schemas()
+        if schemas:
+            payload["tools"] = schemas
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -230,8 +232,24 @@ class ScaffoldEngine:
 
             choice = data.get("choices", [{}])[0]
             message = choice.get("message", {})
+            content = message.get("content", "")
+
+            # Record telemetry
+            usage = data.get("usage", {})
+            user_msg = next((m.content for m in reversed(self.history) if m.role == "user"), "")
+            tool_names = [tc.get("function", {}).get("name", "") for tc in (message.get("tool_calls") or [])]
+            self.recorder.record_ollama_turn(
+                ollama_response={
+                    "prompt_eval_count": usage.get("prompt_tokens", 0),
+                    "eval_count": usage.get("completion_tokens", 0),
+                },
+                user_query=user_msg,
+                response_text=content,
+                tool_calls=tool_names,
+            )
+
             return {
-                "content": message.get("content", ""),
+                "content": content,
                 "tool_calls": message.get("tool_calls"),
             }
         except Exception as e:

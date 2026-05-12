@@ -315,7 +315,9 @@ What are we working on today?
 def create_app(
     model: str = "gpt-oss-120b-abliterated:latest",
     api_base: str = "http://localhost:11434",
+    api_type: str = "ollama",
     workspace: str = ".",
+    system_prompt_file: str = "",
 ) -> Flask:
     """Create the Flask web application."""
     app = Flask(__name__)
@@ -337,13 +339,17 @@ def create_app(
     memory.start_session()
 
     memory_context = memory.get_context_prompt()
-    from lorepunk.__main__ import SYSTEM_PROMPT
-    system_prompt = SYSTEM_PROMPT.format(
-        memory_context=f"\n\nSession context:\n{memory_context}" if memory_context else "",
-    )
+
+    if system_prompt_file and Path(system_prompt_file).is_file():
+        system_prompt = Path(system_prompt_file).read_text()
+    else:
+        from lorepunk.__main__ import SYSTEM_PROMPT
+        system_prompt = SYSTEM_PROMPT.format(
+            memory_context=f"\n\nSession context:\n{memory_context}" if memory_context else "",
+        )
 
     config = EngineConfig(
-        model=model, api_base=api_base, api_type="ollama",
+        model=model, api_base=api_base, api_type=api_type,
         system_prompt=system_prompt,
     )
     engine = ScaffoldEngine(config=config, registry=registry)
@@ -428,13 +434,22 @@ def main():
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--model", default="gpt-oss-120b-abliterated:latest")
     parser.add_argument("--api-base", default="http://localhost:11434")
+    parser.add_argument("--api-type", default="ollama", choices=["ollama", "openai"])
     parser.add_argument("--workspace", default=".")
+    parser.add_argument("--system-prompt", default="", help="Path to custom system prompt file")
     args = parser.parse_args()
 
-    app = create_app(model=args.model, api_base=args.api_base, workspace=args.workspace)
+    app = create_app(
+        model=args.model,
+        api_base=args.api_base,
+        api_type=args.api_type,
+        workspace=args.workspace,
+        system_prompt_file=args.system_prompt,
+    )
 
     print(f"\n  Lorepunk Web UI")
     print(f"  Model: {args.model}")
+    print(f"  API: {args.api_type} @ {args.api_base}")
     print(f"  Workspace: {args.workspace}")
     print(f"  Open: http://localhost:{args.port}\n")
 
