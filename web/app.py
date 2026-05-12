@@ -438,7 +438,9 @@ def main():
     print(f"  Workspace: {args.workspace}")
     print(f"  Open: http://localhost:{args.port}\n")
 
-    app.run(host=args.host, port=args.port, debug=False)
+    from werkzeug.serving import WSGIRequestHandler
+    WSGIRequestHandler.timeout = 600  # 10 min timeout for 235B inference
+    app.run(host=args.host, port=args.port, debug=False, threaded=True)
 
 
 if __name__ == "__main__":

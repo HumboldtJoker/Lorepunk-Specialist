@@ -96,11 +96,23 @@ class ScaffoldEngine:
 
             if not response.get("tool_calls"):
                 text = response.get("content") or ""
-                # Strip Qwen3 thinking tags if present
-                if "<think>" in text and "</think>" in text:
-                    think_end = text.index("</think>") + len("</think>")
-                    text = text[think_end:].strip()
-                # If still empty, ask the model to respond explicitly
+                # Handle Qwen3 thinking mode
+                if "<think>" in text:
+                    if "</think>" in text:
+                        # Has both tags — extract content after thinking
+                        think_end = text.index("</think>") + len("</think>")
+                        after_think = text[think_end:].strip()
+                        if after_think:
+                            text = after_think
+                        else:
+                            # Everything was in think tags — extract the thinking as the response
+                            think_start = text.index("<think>") + len("<think>")
+                            think_content = text[think_start:text.index("</think>")].strip()
+                            text = think_content
+                    else:
+                        # Unclosed think tag — model got cut off, strip the tag and use content
+                        text = text.replace("<think>", "").strip()
+                # If still empty after all processing
                 if not text.strip():
                     text = "(The model returned an empty response. Try rephrasing your request.)"
                 self.history.append(Message(
@@ -162,6 +174,7 @@ class ScaffoldEngine:
             "messages": [m.to_api() for m in self.history],
             "tools": self.registry.get_schemas(),
             "stream": False,
+            "think": False,
             "options": {
                 "temperature": self.config.temperature,
                 "num_predict": self.config.max_tokens,
@@ -175,13 +188,14 @@ class ScaffoldEngine:
 
             message = data.get("message", {})
 
-            # Record telemetry + cache delta data
+            # Record telemetry + cache delta data (raw content before any stripping)
             user_msg = next((m.content for m in reversed(self.history) if m.role == "user"), "")
             tool_names = [tc.get("function", {}).get("name", "") for tc in (message.get("tool_calls") or [])]
+            raw_content = message.get("content") or data.get("response") or ""
             self.recorder.record_ollama_turn(
                 ollama_response=data,
                 user_query=user_msg,
-                response_text=message.get("content", ""),
+                response_text=raw_content,
                 tool_calls=tool_names,
             )
 
