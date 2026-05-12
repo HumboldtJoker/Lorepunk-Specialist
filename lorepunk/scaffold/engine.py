@@ -23,6 +23,7 @@ from typing import Any, Callable, Awaitable
 
 from lorepunk.scaffold.tool_registry import ToolRegistry, ToolResult
 from lorepunk.scaffold.cache_recorder import CacheDeltaRecorder
+from lorepunk.scaffold.transcript import TranscriptRecorder
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +73,11 @@ class ScaffoldEngine:
         config: EngineConfig,
         registry: ToolRegistry,
         recorder: CacheDeltaRecorder | None = None,
+        transcript: TranscriptRecorder | None = None,
     ) -> None:
         self.config = config
         self.recorder = recorder or CacheDeltaRecorder(model_name=config.model)
+        self.transcript = transcript or TranscriptRecorder()
         self.registry = registry
         self.history: list[Message] = []
 
@@ -90,6 +93,7 @@ class ScaffoldEngine:
             role="user", content=user_message,
             timestamp=datetime.now(timezone.utc).isoformat(),
         ))
+        self.transcript.record("user", user_message)
 
         for round_num in range(self.config.max_tool_rounds):
             response = await self._call_llm()
@@ -99,26 +103,23 @@ class ScaffoldEngine:
                 # Handle Qwen3 thinking mode
                 if "<think>" in text:
                     if "</think>" in text:
-                        # Has both tags — extract content after thinking
                         think_end = text.index("</think>") + len("</think>")
                         after_think = text[think_end:].strip()
                         if after_think:
                             text = after_think
                         else:
-                            # Everything was in think tags — extract the thinking as the response
                             think_start = text.index("<think>") + len("<think>")
                             think_content = text[think_start:text.index("</think>")].strip()
                             text = think_content
                     else:
-                        # Unclosed think tag — model got cut off, strip the tag and use content
                         text = text.replace("<think>", "").strip()
-                # If still empty after all processing
                 if not text.strip():
                     text = "(The model returned an empty response. Try rephrasing your request.)"
                 self.history.append(Message(
                     role="assistant", content=text,
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 ))
+                self.transcript.record("assistant", text)
                 return text
 
             self.history.append(Message(
@@ -151,6 +152,7 @@ class ScaffoldEngine:
                     name=tool_name,
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 ))
+                self.transcript.record("tool", result.to_message(), tool_name=tool_name)
 
         return "(Max tool rounds reached. Please try a simpler request.)"
 
