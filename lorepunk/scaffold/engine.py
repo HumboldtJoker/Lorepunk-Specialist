@@ -74,10 +74,12 @@ class ScaffoldEngine:
         registry: ToolRegistry,
         recorder: CacheDeltaRecorder | None = None,
         transcript: TranscriptRecorder | None = None,
+        geometry_recorder: Any = None,
     ) -> None:
         self.config = config
         self.recorder = recorder or CacheDeltaRecorder(model_name=config.model)
         self.transcript = transcript or TranscriptRecorder()
+        self.geometry = geometry_recorder
         self.registry = registry
         self.history: list[Message] = []
 
@@ -120,6 +122,8 @@ class ScaffoldEngine:
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 ))
                 self.transcript.record("assistant", text)
+                if self.geometry:
+                    await self.geometry.record_turn(user_message, text)
                 return text
 
             self.history.append(Message(

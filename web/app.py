@@ -31,6 +31,7 @@ from lorepunk.tools.web_tools import register_web_tools
 from lorepunk.tools.git_tools import register_git_tools
 from lorepunk.tools.task_tools import register_task_tools
 from lorepunk.tools.memory_tools import register_memory_tools
+from lorepunk.research.live_geometry import LiveGeometryRecorder
 
 logger = logging.getLogger(__name__)
 
@@ -354,7 +355,8 @@ def create_app(
         model=model, api_base=api_base, api_type=api_type,
         system_prompt=system_prompt,
     )
-    engine = ScaffoldEngine(config=config, registry=registry)
+    geo = LiveGeometryRecorder(model=model, api_base=api_base) if api_type == "ollama" else None
+    engine = ScaffoldEngine(config=config, registry=registry, geometry_recorder=geo)
 
     @app.route("/")
     def index():
