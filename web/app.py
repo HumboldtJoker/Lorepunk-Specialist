@@ -31,6 +31,7 @@ from lorepunk.tools.web_tools import register_web_tools
 from lorepunk.tools.git_tools import register_git_tools
 from lorepunk.tools.task_tools import register_task_tools
 from lorepunk.tools.memory_tools import register_memory_tools
+from lorepunk.tools.discord_tools import register_discord_tools
 from lorepunk.research.live_geometry import LiveGeometryRecorder
 
 logger = logging.getLogger(__name__)
@@ -333,6 +334,7 @@ def create_app(
     register_git_tools(registry, workspace=workspace)
     register_task_tools(registry, workspace=workspace)
     register_memory_tools(registry, workspace=workspace)
+    register_discord_tools(registry)
 
     spawner = SubagentSpawner(registry, default_model=model, default_api_base=api_base)
     register_subagent_tools(registry, spawner)
