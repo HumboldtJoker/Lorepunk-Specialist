@@ -24,6 +24,7 @@ from lorepunk.tools.git_tools import register_git_tools
 from lorepunk.tools.task_tools import register_task_tools
 from lorepunk.tools.memory_tools import register_memory_tools
 from lorepunk.tools.discord_tools import register_discord_tools
+from lorepunk.tools.comms_tools import register_comms_tools
 
 
 SYSTEM_PROMPT = """You are Lorepunk, a full-spectrum marketing intelligence agent.
@@ -112,6 +113,7 @@ def main() -> None:
     register_task_tools(registry, workspace=args.workspace)
     register_memory_tools(registry, workspace=args.workspace)
     register_discord_tools(registry)
+    register_comms_tools(registry)
 
     # Subagent spawner
     spawner = SubagentSpawner(
